@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sparse Package: git-bash
+  Registers a `bash.exe` App Execution Alias pointing to the Git for Windows bash shell.
+
+  Prerequisites:
+    - Git for Windows installed at the default path:
+        C:\Program Files\Git\usr\bin\bash.exe
+    - If installed elsewhere, update the Executable attributes below.
+
+  Build:
+    MakeAppx.exe pack /d git-bash /p git-bash.msix
+    SignTool.exe sign /fd SHA256 /a /f DevCert.pfx /p <password> git-bash.msix
+
+  Install (requires Developer Mode or package signing trusted by the machine):
+    Add-AppxPackage -Path git-bash.msix
+
+  Identity/Publisher must match the signing certificate's Subject CN.
+  Update the Publisher value below to match your certificate before building.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap3 uap10 desktop">
+
+  <Identity
+    Name="GitBash.AliasPackage"
+    Publisher="CN=Developer"
+    Version="1.0.0.0"
+    ProcessorArchitecture="neutral" />
+
+  <Properties>
+    <DisplayName>Git Bash Alias Package</DisplayName>
+    <PublisherDisplayName>Developer</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>App Execution Alias for Git Bash (bash.exe)</Description>
+    <!-- AllowExternalContent marks this as a Sparse Package; the executable
+         lives outside the package install directory. -->
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+
+  <Dependencies>
+    <!-- Sparse packages and uap10 require Windows 10 2004 (build 19041) or later. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <!--
+      Executable: absolute path to the target binary on the host machine.
+      The path is external to the package (hence AllowExternalContent).
+      Update this path if Git is installed to a non-default location.
+    -->
+    <Application
+      Id="bash"
+      Executable="C:\Program Files\Git\usr\bin\bash.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="Git Bash"
+        Description="GNU Bash shell provided by Git for Windows"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+
+      <Extensions>
+        <!--
+          windows.appExecutionAlias registers `bash.exe` so that calling
+          `bash` (or `bash.exe`) from any command prompt, Run dialog, or
+          another process launches Git's bash shell.
+        -->
+        <uap3:Extension
+          Category="windows.appExecutionAlias"
+          Executable="C:\Program Files\Git\usr\bin\bash.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="bash.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+
+    </Application>
+  </Applications>
+
+</Package>

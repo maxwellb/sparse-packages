@@ -1,0 +1,27 @@
+# Build outputs
+*.msix
+*.msixbundle
+*.msixupload
+*.appx
+*.appxbundle
+
+# Private key files — never commit PFX files (they contain the private key).
+# Commit only the public .cer if a dev certificate is included in the repo.
+*.pfx
+
+# Signing tool password files
+*.pwd
+
+# Windows SDK / MakeAppx working directories
+_tools/
+_output/
+_signed/
+
+# VS / Rider
+.vs/
+*.user
+*.suo
+
+# General
+Thumbs.db
+Desktop.ini

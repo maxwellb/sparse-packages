@@ -1,0 +1,88 @@
+name: Build and Sign Sparse Packages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/AppxManifest.xml'
+      - '**/Assets/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/AppxManifest.xml'
+      - '**/Assets/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # Required for Azure Trusted Signing OIDC authentication
+
+jobs:
+  build:
+    name: Build and Sign
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find Windows SDK tools
+        id: sdk
+        shell: pwsh
+        run: |
+          $sdkBin = 'C:\Program Files (x86)\Windows Kits\10\bin'
+          $makeAppx = Get-ChildItem -Path $sdkBin -Filter MakeAppx.exe -Recurse |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Sort-Object { [version]($_.FullName -replace '.*\\bin\\([0-9.]+)\\.*','$1') } -Descending |
+            Select-Object -First 1
+          if (-not $makeAppx) { throw "MakeAppx.exe not found" }
+          echo "MAKEAPPX=$($makeAppx.FullName)" >> $env:GITHUB_ENV
+          Write-Host "MakeAppx: $($makeAppx.FullName)"
+
+      - name: Build MSIX packages
+        shell: pwsh
+        run: |
+          $outDir = '_output'
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+          $manifests = Get-ChildItem -Filter AppxManifest.xml -Recurse -File |
+            Where-Object { $_.DirectoryName -ne (Get-Location).Path }
+
+          foreach ($manifest in $manifests) {
+            $pkgName = Split-Path $manifest.DirectoryName -Leaf
+            $msixOut = Join-Path $outDir "$pkgName.msix"
+            Write-Host "Packing $pkgName..."
+            & "$env:MAKEAPPX" pack /d $manifest.DirectoryName /p $msixOut /overwrite /nv
+            if ($LASTEXITCODE -ne 0) { throw "MakeAppx failed for $pkgName" }
+            Write-Host "  Created: $msixOut"
+          }
+
+      # -------------------------------------------------------------------------
+      # Dev / PR signing: self-signed certificate stored as a base64 GitHub secret.
+      # Production signing: Azure Trusted Signing (OIDC) on pushes to main.
+      # -------------------------------------------------------------------------
+
+      - name: Sign packages (Azure Trusted Signing)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_TRUSTED_SIGNING_PROFILE }}
+          files-folder: _output
+          files-folder-filter: msix
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Upload MSIX artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparse-packages
+          path: _output/*.msix
+          if-no-files-found: error
